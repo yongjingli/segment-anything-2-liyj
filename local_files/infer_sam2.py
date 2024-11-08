@@ -14,7 +14,7 @@ from sam2.build_sam import build_sam2_video_predictor
 from tqdm import tqdm
 
 
-def show_mask(mask, ax, random_color=False, borders = True):
+def show_mask(mask, ax, random_color=False, borders=True):
     if random_color:
         color = np.concatenate([np.random.random(3), np.array([0.6])], axis=0)
     else:
@@ -77,7 +77,9 @@ def infer_sam2_img():
 
     # img_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/realsense_data/colors/20_color.jpg"
     # img_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261548/colors/20_color.jpg"
-    img_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors/20_color.jpg"
+    # img_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors/20_color.jpg"
+    img_path = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241009/colors/20_color.jpg"
+
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
         image = Image.open(img_path)
         image = np.array(image.convert("RGB"))
@@ -89,8 +91,10 @@ def infer_sam2_img():
         # input_point = np.array([[500, 375]])
         # input_point = np.array([[371, 331]])
         # input_point = np.array([[364, 167]])
-        input_point = np.array([[318, 330]])
+        input_point = np.array([[450, 116]])
         input_label = np.array([1])
+        input_box = np.array([427, 89, 470, 158])
+        # input_box = None
 
         plt.figure(figsize=(10, 10))
         plt.imshow(image)
@@ -101,21 +105,33 @@ def infer_sam2_img():
         plt.show()
 
         print(predictor._features["image_embed"].shape, predictor._features["image_embed"][-1].shape)
+
+        # 输入是点
+        # masks, scores, logits = predictor.predict(
+        #     point_coords=input_point,
+        #     point_labels=input_label,
+        #     multimask_output=True,
+        # )
+
         masks, scores, logits = predictor.predict(
             point_coords=input_point,
             point_labels=input_label,
-            multimask_output=True,
+            box=input_box[None, :] if input_box is not None else None,
+            multimask_output=False,
         )
-        sorted_ind = np.argsort(scores)[::-1]
+        # show_masks(image, masks, scores, box_coords=input_box)
 
+        sorted_ind = np.argsort(scores)[::-1]
         # select max score mask
         sorted_ind = [sorted_ind[0]]
         masks = masks[sorted_ind]
         scores = scores[sorted_ind]
         logits = logits[sorted_ind]
 
-        show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
-        np.save("/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/masks/20_mask.npy", masks[0])
+        # show_masks(image, masks, scores, point_coords=input_point, input_labels=input_label, borders=True)
+
+        show_masks(image, masks, scores, point_coords=input_point, box_coords=input_box, input_labels=input_label, borders=True)
+        np.save("/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241009/masks_num_tmp/20_mask.npy", masks[0])
 
         # input_point = np.array([[500, 375], [1125, 625]])
         # input_label = np.array([1, 1])
@@ -136,13 +152,16 @@ def infer_sam2_video():
     import torch
     from sam2.sam2_video_predictor import SAM2VideoPredictor
     # 可以是视频路径或者文件夹路径
-    video_dir = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors_num"
-    # video_dir = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors_num2"
-    s_mask_dir = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/masks_num"
+    root = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241012_laser"
+    video_dir = os.path.join(root, "colors_num")
+
+    s_mask_dir = os.path.join(root, "masks_num")
     os.makedirs(s_mask_dir, exist_ok=True)
 
-    input_point = np.array([[318, 330]])   # before 335
+    # input_point = np.array([[318, 330]])   # before 335
     # input_point = np.array([[600, 387]])   # after 335
+    # input_point = np.array([[403, 225]])   # after 335
+    input_point = np.array([[393, 175]])   # after 335
     frame_names = [
         p for p in os.listdir(video_dir)
         if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
@@ -223,7 +242,11 @@ def infer_sam2_video():
 
 def save_img_names_2_num():
     # sam是视频输入时，需要用数字进行命名
-    root = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors"
+    # root = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/colors"
+    # root = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/dexgrasp_show_realsense_20241009/colors"
+    # root = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241011/colors"
+    # root = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241012_laser/colors"
+    root = "/home/pxn-lyj/Egolee/data/test/dexgrasp_show_realsense_20241012_no_laser/colors"
     s_root = root + "_num"
     os.makedirs(s_root, exist_ok=True)
 
@@ -240,7 +263,7 @@ def save_img_names_2_num():
         #     os.remove(img_path)
 
 
-def show_mask():
+def show_img_mask():
     mask_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/masks_num/341_mask.npy"
     # mask_path = "/home/pxn-lyj/Egolee/programs/UniDexGrasp_liyj/dexgrasp_generation/local_files/data/render_show_obj000490/realsense_09261855/masks/20_mask.npy"
     mask = np.load(mask_path)
@@ -251,8 +274,8 @@ def show_mask():
 
 if __name__ == "__main__":
     print("Start")
-    # infer_sam2_img()
-    infer_sam2_video()
+    infer_sam2_img()
+    # infer_sam2_video()
     # save_img_names_2_num()
-    # show_mask()
+    # show_img_mask()
     print("End")
